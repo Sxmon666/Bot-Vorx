@@ -13,7 +13,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='..', intents=intents)
 
 # ─── RESPUESTAS "EZ" ──────────────────────────────────────────────────────────
 EZ_RESPONSES = [
@@ -215,19 +215,17 @@ async def imagen(interaction: discord.Interaction, prompt: str):
     await interaction.followup.send(embed=embed)
 
 # ─── PING ────────────────────────────────────────────────────────────────────
-@bot.tree.command(name='ping', description='Muestra la latencia del bot')
-async def ping(interaction: discord.Interaction):
+@bot.command(name='ping')
+async def ping(ctx):
     latencia = round(bot.latency * 1000)
-    await interaction.response.send_message(f'Pong! Latencia: {latencia}ms')
+    await ctx.send(f'Pong! Latencia: {latencia}ms')
 
 # ─── SAY ─────────────────────────────────────────────────────────────────────
-@bot.tree.command(name='say', description='Hace que el bot envie un mensaje en el canal')
-@app_commands.describe(mensaje='Mensaje a enviar', canal='Canal donde enviarlo (opcional)')
-@app_commands.default_permissions(manage_messages=True)
-async def say(interaction: discord.Interaction, mensaje: str, canal: discord.TextChannel = None):
-    destino = canal or interaction.channel
-    await destino.send(mensaje)
-    await interaction.response.send_message('Mensaje enviado.', ephemeral=True)
+@bot.command(name='say')
+@commands.has_permissions(manage_messages=True)
+async def say(ctx, *, mensaje: str):
+    await ctx.message.delete()
+    await ctx.send(mensaje)
 
 # ─── RUN ──────────────────────────────────────────────────────────────────────
 bot.run(TOKEN)
