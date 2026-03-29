@@ -4,8 +4,10 @@ from discord.ext import commands
 import random
 import urllib.parse
 
+# ─── CONFIG ───────────────────────────────────────────────────────────────────
 import os
 TOKEN = os.environ.get('TOKEN')
+# ──────────────────────────────────────────────────────────────────────────────
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -211,6 +213,21 @@ async def imagen(interaction: discord.Interaction, prompt: str):
     embed.set_footer(text=f'Pedido por {interaction.user}')
     embed.timestamp = datetime.datetime.utcnow()
     await interaction.followup.send(embed=embed)
+
+# ─── PING ────────────────────────────────────────────────────────────────────
+@bot.tree.command(name='ping', description='Muestra la latencia del bot')
+async def ping(interaction: discord.Interaction):
+    latencia = round(bot.latency * 1000)
+    await interaction.response.send_message(f'Pong! Latencia: {latencia}ms')
+
+# ─── SAY ─────────────────────────────────────────────────────────────────────
+@bot.tree.command(name='say', description='Hace que el bot envie un mensaje en el canal')
+@app_commands.describe(mensaje='Mensaje a enviar', canal='Canal donde enviarlo (opcional)')
+@app_commands.default_permissions(manage_messages=True)
+async def say(interaction: discord.Interaction, mensaje: str, canal: discord.TextChannel = None):
+    destino = canal or interaction.channel
+    await destino.send(mensaje)
+    await interaction.response.send_message('Mensaje enviado.', ephemeral=True)
 
 # ─── RUN ──────────────────────────────────────────────────────────────────────
 bot.run(TOKEN)
