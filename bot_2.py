@@ -4,9 +4,8 @@ from discord.ext import commands
 import random
 import urllib.parse
 
-# ─── CONFIG ───────────────────────────────────────────────────────────────────
-TOKEN = 'MTQ4NzU5NTczNjQ4Mzg4OTI1Mw.GttQtl.6Og8Pz8V2t5lnXhaZ5GPEVI81EnFEjEWHI8amM'
-# ──────────────────────────────────────────────────────────────────────────────
+import os
+TOKEN = os.environ.get('TOKEN')
 
 intents = discord.Intents.default()
 intents.message_content = True
