@@ -3,6 +3,8 @@ from discord import app_commands
 from discord.ext import commands
 import random
 import urllib.parse
+import asyncio
+import yt_dlp
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 import os
@@ -226,6 +228,110 @@ async def ping(ctx):
 async def say(ctx, *, mensaje: str):
     await ctx.message.delete()
     await ctx.send(mensaje)
+
+
+# ─── MUSICA ───────────────────────────────────────────────────────────────────
+queues = {}
+
+YTDL_OPTIONS = {
+    'format': 'bestaudio/best',
+    'noplaylist': True,
+    'quiet': True,
+    'default_search': 'ytsearch',
+    'source_address': '0.0.0.0',
+}
+
+FFMPEG_OPTIONS = {
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+    'options': '-vn',
+}
+
+def get_queue(guild_id):
+    if guild_id not in queues:
+        queues[guild_id] = []
+    return queues[guild_id]
+
+async def play_next(ctx):
+    queue = get_queue(ctx.guild.id)
+    if not queue:
+        return
+    url, title = queue.pop(0)
+    source = discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS)
+    ctx.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
+    await ctx.send(f'Reproduciendo: **{title}**')
+
+@bot.command(name='play', aliases=['p'])
+async def play(ctx, *, busqueda: str):
+    if not ctx.author.voice:
+        return await ctx.send('Tenes que estar en un canal de voz.')
+    canal = ctx.author.voice.channel
+    if ctx.voice_client is None:
+        await canal.connect()
+    elif ctx.voice_client.channel != canal:
+        await ctx.voice_client.move_to(canal)
+
+    await ctx.send(f'Buscando: **{busqueda}**...')
+
+    loop = asyncio.get_event_loop()
+    with yt_dlp.YoutubeDL(YTDL_OPTIONS) as ydl:
+        try:
+            info = await loop.run_in_executor(None, lambda: ydl.extract_info(f'ytsearch:{busqueda}', download=False))
+            if 'entries' in info:
+                info = info['entries'][0]
+            url = info['url']
+            title = info.get('title', 'Desconocido')
+        except Exception as e:
+            return await ctx.send(f'No se pudo encontrar la cancion: {e}')
+
+    queue = get_queue(ctx.guild.id)
+    if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
+        queue.append((url, title))
+        await ctx.send(f'Agregado a la cola: **{title}**')
+    else:
+        queue.append((url, title))
+        await play_next(ctx)
+
+@bot.command(name='skip', aliases=['s'])
+async def skip(ctx):
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.stop()
+        await ctx.send('Cancion saltada.')
+    else:
+        await ctx.send('No hay nada reproduciendose.')
+
+@bot.command(name='pause')
+async def pause(ctx):
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.pause()
+        await ctx.send('Pausado.')
+    else:
+        await ctx.send('No hay nada reproduciendose.')
+
+@bot.command(name='resume', aliases=['r'])
+async def resume(ctx):
+    if ctx.voice_client and ctx.voice_client.is_paused():
+        ctx.voice_client.resume()
+        await ctx.send('Reanudado.')
+    else:
+        await ctx.send('No hay nada pausado.')
+
+@bot.command(name='stop')
+async def stop(ctx):
+    if ctx.voice_client:
+        get_queue(ctx.guild.id).clear()
+        ctx.voice_client.stop()
+        await ctx.voice_client.disconnect()
+        await ctx.send('Musica detenida y bot desconectado.')
+    else:
+        await ctx.send('El bot no esta en un canal de voz.')
+
+@bot.command(name='cola', aliases=['queue', 'q'])
+async def cola(ctx):
+    queue = get_queue(ctx.guild.id)
+    if not queue:
+        return await ctx.send('La cola esta vacia.')
+    lista = '\n'.join([f'{i+1}. {title}' for i, (_, title) in enumerate(queue)])
+    await ctx.send(f'Cola de reproduccion:\n{lista}')
 
 # ─── RUN ──────────────────────────────────────────────────────────────────────
 bot.run(TOKEN)
